@@ -39,11 +39,12 @@ export default class TodaySummaryPlugin extends Plugin {
       .filter(f => f.stat.mtime >= start && f.stat.mtime <= end);
     if (!files.length) return new Notice("本日更新されたノートはありません");
 
+    const fileNames = files.map(f => f.basename).join(", ");
     const txt = (await Promise.all(files.map(f => this.app.vault.cachedRead(f)))).join("\n\n---\n\n");
     const chunks = this.chunk(txt, 12_000);
     const partial = await Promise.all(chunks.map((c: string, i: number) => this.openai(c, i, chunks.length)));
     const finalSummary = await this.openai(partial.join("\n\n"), 0, 1, true);
-    this.showModal(finalSummary);
+    this.showModal(finalSummary, fileNames);
   }
 
   private chunk(text: string, size: number): string[] {
@@ -100,8 +101,8 @@ export default class TodaySummaryPlugin extends Plugin {
     throw new Error("Max retries exceeded");
   }
 
-  private showModal(content: string) {
-    new SummaryModal(this.app, content).open();
+  private showModal(content: string, fileNames: string) {
+    new SummaryModal(this.app, content, fileNames).open();
   }
 }
 
@@ -148,16 +149,21 @@ class TodaySummarySettingTab extends PluginSettingTab {
 /** 要約結果表示モーダル */
 class SummaryModal extends Modal {
   content: string;
+  fileNames: string;
 
-  constructor(app: any, content: string) {
+  constructor(app: any, content: string, fileNames: string) {
     super(app);
     this.content = content;
+    this.fileNames = fileNames;
   }
 
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl("h2", { text: "今日の要約" });
+    contentEl.createEl("h3", { text: "更新されたファイル:" });
+    contentEl.createEl("p", { text: this.fileNames });
+    contentEl.createEl("h3", { text: "要約:" });
     contentEl.createEl("div", { text: this.content });
   }
 
