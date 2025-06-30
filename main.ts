@@ -72,7 +72,7 @@ export default class TodaySummaryPlugin extends Plugin {
           "Authorization": `Bearer ${this.settings.openaiKey}`
         },
         body: JSON.stringify({
-          model: "gpt-3.5-turbo",
+          model: "gpt-4.1",
           messages: [{ role: "user", content: prompt }],
           max_tokens: 1000
         })
