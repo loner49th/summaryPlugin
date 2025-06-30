@@ -41,7 +41,7 @@ export default class TodaySummaryPlugin extends Plugin {
 
     const fileNames = files.map(f => f.basename).join(", ");
     const txt = (await Promise.all(files.map(f => this.app.vault.cachedRead(f)))).join("\n\n---\n\n");
-    const chunks = this.chunk(txt, 12_000);
+    const chunks = this.chunk(txt, 100_000);
     const partial = await Promise.all(chunks.map((c: string, i: number) => this.openai(c, i, chunks.length)));
     const finalSummary = await this.openai(partial.join("\n\n"), 0, 1, true);
     this.showModal(finalSummary, fileNames);
@@ -75,7 +75,7 @@ export default class TodaySummaryPlugin extends Plugin {
         body: JSON.stringify({
           model: "gpt-4.1",
           messages: [{ role: "user", content: prompt }],
-          max_tokens: 1000
+          max_tokens: 16000
         })
       });
 
@@ -161,14 +161,44 @@ class SummaryModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl("h2", { text: "今日の要約" });
+    
     contentEl.createEl("h3", { text: "更新されたファイル:" });
     contentEl.createEl("p", { text: this.fileNames });
-    contentEl.createEl("h3", { text: "要約:" });
-    contentEl.createEl("div", { text: this.content });
+    
+    const summaryHeader = contentEl.createEl("div", { cls: "summary-header" });
+    summaryHeader.createEl("h3", { text: "要約:", cls: "summary-title" });
+    
+    const copyButton = summaryHeader.createEl("button", { 
+      text: "コピー", 
+      cls: "mod-cta summary-copy-btn" 
+    });
+    
+    copyButton.addEventListener("click", () => this.copyToClipboard());
+    
+    const summaryContent = contentEl.createEl("div", { 
+      text: this.content, 
+      cls: "summary-content" 
+    });
   }
 
   onClose() {
     const { contentEl } = this;
     contentEl.empty();
+  }
+
+  private async copyToClipboard() {
+    try {
+      await navigator.clipboard.writeText(this.content);
+      new Notice("要約をクリップボードにコピーしました");
+    } catch (error) {
+      // フォールバック: テキストエリアを使用
+      const textArea = document.createElement("textarea");
+      textArea.value = this.content;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      new Notice("要約をクリップボードにコピーしました");
+    }
   }
 }
